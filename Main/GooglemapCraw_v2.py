@@ -1,14 +1,17 @@
 from selenium.webdriver import Chrome
+from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver.common.by import By
 import urllib.parse
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.expected_conditions import visibility_of_all_elements_located,presence_of_element_located,presence_of_all_elements_located
 from threading import Thread
 from typing import List,Dict
+from tqdm import tqdm
 
 class GooglemapCraw():
-    def  __init__(self,search_term,craw_num:int,review_num:int=100,thread_num:int=1,optional:bool=True):
+    def  __init__(self,search_term,restaurant_num:int,review_num:int=100,thread_num:int=1,optional:bool=True):
 
         # Chrome 옵션 설정
         self.chrome_options = Options()
@@ -18,7 +21,7 @@ class GooglemapCraw():
             pass
 
         self.main_drive=Chrome(options=self.chrome_options) # url까지 크롤
-        self.craw_num=craw_num
+        self.restaurant_num=restaurant_num
         self.search_term=search_term
         self.infos=[] # 레스토랑 저장공간
         self.reviews=[] #리뷰 저장공간
@@ -29,26 +32,6 @@ class GooglemapCraw():
         self.base_path=f"https://www.google.co.kr/maps/search/{encoded_text}" # 크롤링이 될 주소(파싱될 예정)
         pass
 
-    def __restuarant_properties(self,search_term,restaurant_name,url,address,rating,category,**kwrargs):
-    
-        properties={"검색어" : {"rich_text" : [{"text": {"content": search_term}}]},
-                "음식점이름" : {"title" : [{"text" : {'content': restaurant_name}}]},
-                "URL" : {"url" : url},
-                "주소" : {"rich_text" : [{"text": {"content": address}}]},
-                "별점" : {"number" : rating},
-                "카테고리" : {"rich_text" : [{"text": {"content": category}}]}
-                }
-        return properties
-
-    # 리뷰 db insert 기초 틀
-    def __review_properties(self,restaurant_name,user,review,**kwargs):
-
-        properties={"음식점이름" : {"title" : [{"text": {"content": restaurant_name}}]},
-                    "유저" : {"rich_text" : [{"text": {"content": user}}]},
-                    "리뷰" : {"rich_text" : [{"text": {"content": review}}]}
-                    }
-        return properties
-    
     # 멀티 스래딩 적용 
     def __crawras(self,sub_info_list:List[Dict],**kwargs):
         sub_drive=Chrome(options=self.chrome_options)
@@ -84,7 +67,7 @@ class GooglemapCraw():
     def __subrevtable(self,sub_review:WebElement):
         splited_table={}
         try:
-            reviewer_table=WebDriverWait(sub_review,3).until(
+            reviewer_table=WebDriverWait(sub_review,1).until(
                     presence_of_all_elements_located([By.XPATH,".//div[@jslog]/div[contains(@jslog,'metadata')]"]))
             #구분자 설정
             def spliter(text:str):
@@ -107,7 +90,7 @@ class GooglemapCraw():
 
             #정보선택칸
             tabs=WebDriverWait(sub_drive,3).until(
-            presence_of_all_elements_located([By.XPATH, '//*[@role="tab"]']))
+            presence_of_all_elements_located([By.XPATH, '//button[@role="tab"]']))
             tab_select={element.text.strip():element for element in tabs} 
 
             #리뷰 크롤링
@@ -147,7 +130,7 @@ class GooglemapCraw():
                 sub_drive.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", sub_review)
 
                 try:
-                    button=WebDriverWait(sub_review,3).until(
+                    button=WebDriverWait(sub_review,2).until(
                     presence_of_element_located([By.XPATH,".//button[contains(text(),'자세히')]"]))
                     button.click()
                 except: # 리뷰가 짧으면 없음
@@ -199,7 +182,7 @@ class GooglemapCraw():
                  presence_of_all_elements_located([By.XPATH,"//a[@href and @aria-label]"]))
             
 
-            if len(feed_box)>self.craw_num:
+            if len(feed_box)>self.restaurant_num:
                 break
         
         for sub_feed in feed_box:
@@ -223,17 +206,18 @@ class GooglemapCraw():
             thread_list4ras.append(sub_thread4ras)
             sub_thread4ras.start()        
                 
-        for sub_thread in thread_list4ras:
+        for sub_thread in tqdm(thread_list4ras):
             sub_thread.join()
 
     def craw_rev(self):
         thread_list4rev=[]
+        m=len(self.infos)//self.thread_num
         for n in range(self.thread_num):
             kw=self.infos[n*m:(n+1)*m]
             sub_thread4rev=Thread(target=self.__crawrev,kwargs=({"sub_info_list":kw}))
             thread_list4rev.append(sub_thread4rev)
             sub_thread4rev.start()
 
-        for sub_thread in thread_list4rev:
+        for sub_thread in tqdm(thread_list4rev):
             sub_thread.join()
 
