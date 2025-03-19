@@ -221,3 +221,8 @@ class GooglemapCraw():
         for sub_thread in tqdm(thread_list4rev):
             sub_thread.join()
 
+if __name__=="main":
+    main_drive=GooglemapCraw(
+        '강남 맛집',restaurant_num=100,review_num=100,thread_num=1,optional=False
+    )
+    main_drive.craw_ras()
