@@ -10,7 +10,7 @@ from threading import Thread
 from tqdm import tqdm
 
 class UserBaseRev:
-    def __init__(self,review_num:int=100,thread_num:int=1,optional:bool=True,*args):
+    def __init__(self,url_list:List[str],review_num:int=100,thread_num:int=1,optional:bool=True,*args):
         self.chrome_options = Options()
         if optional:
             self.chrome_options.add_argument("--headless")  # Headless 모드
@@ -23,6 +23,7 @@ class UserBaseRev:
         self.thread_num=thread_num
         self.review_num=review_num
         self.drivelist=[]
+        self.url_list=url_list # 유저 url
 
         for _ in range(thread_num):
             sub_drive=Chrome(options=self.chrome_options)
@@ -154,12 +155,12 @@ class UserBaseRev:
              craw_result.append(self.__get_info__(table))
         return craw_result
     
-    def crawreview(self,url_list:List[str],thread_num:int):
+    def crawreview(self,thread_num:int):
         thread_list=[]
-        n=len(url_list)//thread_num
+        n=len(self.url_list)//thread_num
 
         for i in range(thread_num):
-            url_lst=[url[i*n:(i+1)] for url in url_list]
+            url_lst=[url[i*n:(i+1)] for url in self.url_list]
             sub_thread=Thread(target=lambda urls : [self.__crawrev(url) for url in urls],kwargs={"urls":url_lst})
             thread_list.append(sub_thread)
             sub_thread.start()
